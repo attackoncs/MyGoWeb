@@ -1,28 +1,27 @@
 package myweb
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 )
 
 // HandlerFunc是处理程序
-type HandlerFunc func(w http.ResponseWriter, req *http.Request)
+type HandlerFunc func(c *Context)
 
 // Engine定义
 type Engine struct {
-	router map[string]HandlerFunc
+	router *router
 }
 
 // 创建实例
 func New() *Engine {
-	return &Engine{router: make(map[string]HandlerFunc)}
+	return &Engine{router: newRouter()}
 }
 
 // 添加路由
 func (engine *Engine) addRoute(method string, pattern string, handler HandlerFunc) {
 	log.Printf("Route %4s - %s", method, pattern)
-	engine.router[method+"-"+pattern] = handler
+	engine.router.addRouter(method, pattern, handler)
 }
 
 // 添加GET路由
@@ -44,10 +43,6 @@ func (engine *Engine) Run(addr string) (err error) {
 
 // 只要传入任何实现ServerHTTP接口的实例，所有HTTP请求，都由该实例处理
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	key := req.Method + "-" + req.URL.Path
-	if handler, ok := engine.router[key]; ok {
-		handler(w, req)
-	} else {
-		fmt.Fprintf(w, "404 NOT FOUND:%s\n", req.URL)
-	}
+	c := newContext(w, req)
+	engine.router.handle(c)
 }
