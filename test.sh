@@ -8,3 +8,7 @@ curl "http://localhost:9999/login" -X POST -d 'username=attackoncs&password=1234
 echo "test /Not"
 curl "http://localhost:9999/Not"
 echo "-----------------day 2-----------------"
+echo "-----------------day 3-----------------"
+curl "http://localhost:9999/hello/attackoncs"
+curl "http://localhost:9999/assets/css/attackoncs.css"
+echo "-----------------day 3-----------------"

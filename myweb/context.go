@@ -17,8 +17,16 @@ type Context struct {
 	//request info
 	Path   string
 	Method string
+	Params map[string]string //新增对象，存储解析到的参数
 	//response info
 	StatusCode int
+}
+
+// 获取存储的解析到的参数，如/hello/:name,/hello/attackoncs
+// 解析存储到的c.Params["name"]="attackoncs"
+func (c *Context) Param(key string) string {
+	value, _ := c.Params[key]
+	return value
 }
 
 // 创建Context实例
