@@ -8,30 +8,59 @@ import (
 // HandlerFunc是处理程序
 type HandlerFunc func(c *Context)
 
-// Engine定义
-type Engine struct {
-	router *router
-}
+// RouterGroup和Engine定义
+type (
+	RouterGroup struct {
+		prefix      string
+		middlewares []HandlerFunc
+		parent      *RouterGroup
+		//Group对象要有访问Router能力，定义指向它的指针，从而所有资源统一由其协调和访问
+		engine *Engine
+	}
+	Engine struct {
+		//嵌入，可访问RouterGroup中字段而无需命名
+		*RouterGroup
+		router *router
+		//Engine作为最顶层分组，拥有RouterGroup所有能力，存储所有groups
+		groups []*RouterGroup
+	}
+)
 
 // 创建实例
 func New() *Engine {
-	return &Engine{router: newRouter()}
+	engine := &Engine{router: newRouter()}
+	engine.RouterGroup = &RouterGroup{engine: engine}
+	engine.groups = []*RouterGroup{engine.RouterGroup}
+	return engine
 }
 
-// 添加路由
-func (engine *Engine) addRoute(method string, pattern string, handler HandlerFunc) {
+// 创建分组，由Engine统一管理，因此所有分组都共享统一Engine实例
+func (g *RouterGroup) Group(prefix string) *RouterGroup {
+	routerGroup := &RouterGroup{
+		prefix: g.prefix + prefix, //注意这里需加上g.prefix
+		parent: g,                 //画图就明白，把两个结构以图的形式画出
+		engine: g.engine,          //共享统一Engine实例
+	}
+	//这里要append到g.engine.groups，因为所有分组都共享统一Engine实例
+	g.engine.groups = append(g.engine.groups, routerGroup)
+	return routerGroup
+}
+
+// 添加路由，这里没使用parent，之前设计时后面简化，所以RouterGroup的parent可去掉
+func (g *RouterGroup) addRoute(method string, comp string, handler HandlerFunc) {
+	pattern := g.prefix + comp
 	log.Printf("Route %4s - %s", method, pattern)
-	engine.router.addRouter(method, pattern, handler)
+	g.engine.router.addRouter(method, pattern, handler)
 }
 
-// 添加GET路由
-func (engine *Engine) GET(pattern string, handler HandlerFunc) {
-	engine.addRoute("GET", pattern, handler)
+// 添加GET路由，注意改成g
+func (g *RouterGroup) GET(pattern string, handler HandlerFunc) {
+	g.addRoute("GET", pattern, handler)
 }
 
-// 添加POST路由
-func (engine *Engine) POST(pattern string, handler HandlerFunc) {
-	engine.addRoute("POST", pattern, handler)
+// 添加POST路由，注意改成g
+func (g *RouterGroup) POST(pattern string, handler HandlerFunc) {
+	g.addRoute("POST", pattern, handler)
 }
 
 // 启动web服务
