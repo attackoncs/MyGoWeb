@@ -9,7 +9,7 @@ import (
 // 方便构建JSON数据
 type H map[string]interface{}
 
-// Context结构体，封装请求和响应、请求的Method、Path和响应的响应码
+// Context结构体，封装请求和响应、请求的Method、Path和响应的响应码、中间件
 type Context struct {
 	//objects
 	Request *http.Request
@@ -20,6 +20,9 @@ type Context struct {
 	Params map[string]string //新增对象，存储解析到的参数
 	//response info
 	StatusCode int
+	//middleware
+	handlers []HandlerFunc
+	index    int
 }
 
 // 获取存储的解析到的参数，如/hello/:name,/hello/attackoncs
@@ -36,7 +39,22 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Writer:  w,
 		Path:    req.URL.Path,
 		Method:  req.Method,
+		index:   -1,
 	}
+}
+
+// 中间件调下个流程，注意这里要遍历所有handler，原因是不是所有的handler都会调Next，手动调Next
+// 一般用于在请求前后各实现一些行为。若只作用请求前，则可省略掉Next,算是兼容性比较好的写法。
+func (c *Context) Next() {
+	c.index++
+	for ; c.index < len(c.handlers); c.index++ {
+		c.handlers[c.index](c)
+	}
+}
+
+func (c *Context) Fail(code int, err string) {
+	c.index = len(c.handlers)
+	c.JSON(code, H{"message": err})
 }
 
 // 填充请求中的key

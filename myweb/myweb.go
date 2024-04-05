@@ -3,6 +3,7 @@ package myweb
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 // HandlerFunc是处理程序
@@ -63,6 +64,11 @@ func (g *RouterGroup) POST(pattern string, handler HandlerFunc) {
 	g.addRoute("POST", pattern, handler)
 }
 
+// 添加中间件到group中
+func (g *RouterGroup) Use(middlewares ...HandlerFunc) {
+	g.middlewares = append(g.middlewares, middlewares...)
+}
+
 // 启动web服务
 func (engine *Engine) Run(addr string) (err error) {
 	// go中实现某个接口方法的类型都可自动转换为某个接口类型
@@ -70,8 +76,17 @@ func (engine *Engine) Run(addr string) (err error) {
 	return http.ListenAndServe(addr, engine)
 }
 
-// 只要传入任何实现ServerHTTP接口的实例，所有HTTP请求，都由该实例处理
+// 只要传入任何实现ServerHTTP接口的实例，所有HTTP请求，都由该实例处理，注意中间件要在请求前后。
+// 中间件要应用到某个Group
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
+
 	c := newContext(w, req)
+	c.handlers = middlewares
 	engine.router.handle(c)
 }

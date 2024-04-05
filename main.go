@@ -1,12 +1,18 @@
 package main
 
 import (
+	"log"
 	"myweb"
 	"net/http"
+	"time"
 )
 
 func main() {
 	engine := myweb.New()
+	engine.Use(myweb.Logger())
+	engine.GET("/", func(c *myweb.Context) {
+		c.HTML(http.StatusOK, "<h1>Hello Myweb</h1>")
+	})
 	engine.GET("/index", func(c *myweb.Context) {
 		c.HTML(http.StatusOK, "<h1>Index Page</h1>")
 	})
@@ -20,6 +26,7 @@ func main() {
 		})
 	}
 	v2 := engine.Group("/v2")
+	v2.Use(onlyForV2())
 	{
 		v2.GET("/hello/:name", func(c *myweb.Context) {
 			c.String(http.StatusOK, "hello %s,you're at %s\n", c.Param("name"), c.Path)
@@ -33,4 +40,12 @@ func main() {
 	}
 
 	engine.Run(":9999")
+}
+
+func onlyForV2() myweb.HandlerFunc {
+	return func(c *myweb.Context) {
+		t := time.Now()
+		c.Fail(500, "Internal Server Error")
+		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Request.RequestURI, time.Since(t))
+	}
 }
