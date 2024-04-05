@@ -40,6 +40,13 @@ func New() *Engine {
 	return engine
 }
 
+// Default默认添加Logger() & Recovery() middlewares
+func Default() *Engine {
+	engine := New()
+	engine.Use(Logger(), Recovery())
+	return engine
+}
+
 // 创建分组，由Engine统一管理，因此所有分组都共享统一Engine实例
 func (g *RouterGroup) Group(prefix string) *RouterGroup {
 	routerGroup := &RouterGroup{
