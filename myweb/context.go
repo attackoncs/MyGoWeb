@@ -23,6 +23,8 @@ type Context struct {
 	//middleware
 	handlers []HandlerFunc
 	index    int
+	//engine指针
+	engine *Engine
 }
 
 // 获取存储的解析到的参数，如/hello/:name,/hello/attackoncs
@@ -101,9 +103,11 @@ func (c *Context) Data(code int, data []byte) {
 	c.Writer.Write(data)
 }
 
-// 构造HTML响应
-func (c *Context) HTML(code int, html string) {
+// 构造HTML响应，html渲染，参考https://golang.org/pkg/html/template/
+func (c *Context) HTML(code int, name string, data interface{}) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
-	c.Writer.Write([]byte(html))
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
+		c.Fail(500, err.Error())
+	}
 }

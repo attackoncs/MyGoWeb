@@ -1,8 +1,10 @@
 package myweb
 
 import (
+	"html/template"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -24,6 +26,9 @@ type (
 		router *router
 		//Engine作为最顶层分组，拥有RouterGroup所有能力，存储所有groups
 		groups []*RouterGroup
+		//html渲染
+		htmlTemplates *template.Template //将所有模板加载进内存
+		funcMap       template.FuncMap   //所有自定义模板渲染函数
 	}
 )
 
@@ -69,6 +74,29 @@ func (g *RouterGroup) Use(middlewares ...HandlerFunc) {
 	g.middlewares = append(g.middlewares, middlewares...)
 }
 
+// 创建静态处理的Handler
+func (g *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
+	absolutePath := path.Join(g.prefix, relativePath)
+	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
+	return func(c *Context) {
+		file := c.Param("filepath")
+		//判断是否有文件且有权限
+		if _, err := fs.Open(file); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// 静态处理，给用户暴露的接口，可将磁盘上某个文件夹root映射到路由relativePath
+func (g *RouterGroup) Static(relativePath string, root string) {
+	handler := g.createStaticHandler(relativePath, http.Dir(root))
+	urlPattern := path.Join(relativePath, "/*filepath")
+	//Register GET handlers
+	g.addRoute("GET", urlPattern, handler)
+}
+
 // 启动web服务
 func (engine *Engine) Run(addr string) (err error) {
 	// go中实现某个接口方法的类型都可自动转换为某个接口类型
@@ -88,5 +116,16 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	c := newContext(w, req)
 	c.handlers = middlewares
+	c.engine = engine //设置engine，这样就能通过Context访问Engine中HTML模板
 	engine.router.handle(c)
+}
+
+// 设置自定义渲染函数funcMap
+func (engine *Engine) SetFuncMap(funcMap template.FuncMap) {
+	engine.funcMap = funcMap
+}
+
+// 加载模板
+func (engine *Engine) LoadHTMLGlob(pattern string) {
+	engine.htmlTemplates = template.Must(template.New("").Funcs(engine.funcMap).ParseGlob(pattern))
 }
